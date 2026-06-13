@@ -50,10 +50,17 @@ func (r *postgresUserRepository) Create(user *model.User) error {
 		user.Role = model.RoleUser
 	}
 
+	// Insert NULL (not "") for an empty email so multiple accounts without an
+	// email (e.g. WeChat-only logins) don't collide on the UNIQUE(email) index.
+	var emailArg interface{}
+	if user.Email != "" {
+		emailArg = user.Email
+	}
+
 	err := r.db.QueryRow(
 		query,
 		user.ID,
-		user.Email,
+		emailArg,
 		user.PasswordHash,
 		user.OAuthProvider,
 		user.OAuthID,

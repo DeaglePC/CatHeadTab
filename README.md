@@ -127,7 +127,7 @@
 
 ### 账号与云同步
 
-- **4 种认证方式**：邮箱 + 密码、GitHub OAuth、Google OAuth、CLI 管理员创建
+- **5 种认证方式**：邮箱 + 密码、GitHub OAuth、Google OAuth、微信公众号（关注 + 验证码）、CLI 管理员创建
 - **智能同步**：基于时间戳自动检测本地/云端变更；布局结构不同时弹出冲突解决面板
 - **同步内容**：桌面布局（多页 + Dock）、偏好设置、壁纸（WebP 二进制）、头像
 
@@ -254,6 +254,7 @@ docker exec -it catheadtab-backend ./server user set-role
 |------|--------|--------|
 | SMTP | 注册跳过邮箱验证 | 完整邮箱验证 + 密码重置 |
 | GitHub/Google OAuth | SSO 按钮自动隐藏 | 完整 SSO 登录 + 账号关联 |
+| 微信公众号 | 「微信登录」按钮隐藏 | 关注 + 验证码登录/注册 + 账号绑定（个人未认证订阅号即可用） |
 | Wallhaven API Key | 仅 SFW 壁纸 | SFW + Sketchy 内容 |
 | 腾讯云 COS | COS 壁纸源隐藏 | 云端壁纸库可用 |
 | 日志文件 (`LOG_FILE`) | 仅控制台输出 | 控制台 + 文件轮转存储 |

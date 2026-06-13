@@ -56,11 +56,13 @@ func validateEmail(email string) string {
 
 // AuthHandler handles authentication endpoints.
 type AuthHandler struct {
-	userRepo     repository.UserRepository
-	verifyRepo   repository.VerificationRepository
-	oauthRepo    repository.OAuthRepository
-	emailService *service.EmailService
-	cfg          *config.Config
+	userRepo       repository.UserRepository
+	verifyRepo     repository.VerificationRepository
+	oauthRepo      repository.OAuthRepository
+	emailService   *service.EmailService
+	wechatSvc      *service.WeChatService
+	wechatSessions *service.WeChatSessionStore
+	cfg            *config.Config
 }
 
 // NewAuthHandler creates a new AuthHandler.
@@ -69,14 +71,18 @@ func NewAuthHandler(
 	verifyRepo repository.VerificationRepository,
 	oauthRepo repository.OAuthRepository,
 	emailService *service.EmailService,
+	wechatSvc *service.WeChatService,
+	wechatSessions *service.WeChatSessionStore,
 	cfg *config.Config,
 ) *AuthHandler {
 	return &AuthHandler{
-		userRepo:     userRepo,
-		verifyRepo:   verifyRepo,
-		oauthRepo:    oauthRepo,
-		emailService: emailService,
-		cfg:          cfg,
+		userRepo:       userRepo,
+		verifyRepo:     verifyRepo,
+		oauthRepo:      oauthRepo,
+		emailService:   emailService,
+		wechatSvc:      wechatSvc,
+		wechatSessions: wechatSessions,
+		cfg:            cfg,
 	}
 }
 
@@ -720,6 +726,7 @@ func (h *AuthHandler) GetOAuthConfig(c *gin.Context) {
 		"github_client_id":   h.cfg.GitHubClientID,
 		"google_client_id":   h.cfg.GoogleClientID,
 		"oauth_callback_url": backendURL + "/api/v1/auth/callback",
+		"wechat_enabled":     h.cfg.IsWeChatConfigured(),
 	})
 }
 
