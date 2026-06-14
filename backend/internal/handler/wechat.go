@@ -47,6 +47,35 @@ type wechatEncryptedEnvelope struct {
 	Encrypt    string `xml:"Encrypt"`
 }
 
+// wechatReplyKind selects how the callback responds to a message.
+type wechatReplyKind int
+
+const (
+	wechatReplyNone       wechatReplyKind = iota // ack "success", no message
+	wechatReplyText                              // passive text reply
+	wechatReplyAITransfer                        // hand off to the official AI reply
+)
+
+// wechatReply is the decision returned by message handling.
+type wechatReply struct {
+	kind wechatReplyKind
+	text string // used when kind == wechatReplyText
+}
+
+// looksLikeWeChatCode reports whether a (normalized) string has the shape of a
+// verification code, so normal chat messages aren't mistaken for login attempts.
+func looksLikeWeChatCode(s string) bool {
+	if len(s) != wechatCodeLen {
+		return false
+	}
+	for _, r := range s {
+		if !strings.ContainsRune(wechatCodeCharset, r) {
+			return false
+		}
+	}
+	return true
+}
+
 // generateWeChatCode returns a short, unambiguous, uppercase verification code.
 func generateWeChatCode() (string, error) {
 	b := make([]byte, wechatCodeLen)
@@ -221,29 +250,40 @@ func (h *AuthHandler) WeChatCallback(c *gin.Context) {
 		return
 	}
 
-	replyText := h.handleWeChatMessage(&msg)
-	h.writeWeChatReply(c, &msg, replyText, timestamp, nonce, encrypted)
+	reply := h.handleWeChatMessage(&msg)
+	h.writeWeChatReply(c, &msg, reply, timestamp, nonce, encrypted)
 }
 
-// handleWeChatMessage routes a callback message and returns the passive reply
-// text ("" = reply "success" with no message).
-func (h *AuthHandler) handleWeChatMessage(msg *wechatEventMessage) string {
+// handleWeChatMessage routes a callback message: code-shaped text messages are
+// treated as login/link attempts, everything else is either handed to the
+// official AI reply (when WECHAT_AI_REPLY is on) or acknowledged silently.
+func (h *AuthHandler) handleWeChatMessage(msg *wechatEventMessage) wechatReply {
 	switch msg.MsgType {
 	case "event":
 		// New followers get a welcome that explains the next step.
 		if msg.Event == "subscribe" {
-			return wechatWelcomeText
+			return wechatReply{kind: wechatReplyText, text: wechatWelcomeText}
 		}
-		return ""
+		return wechatReply{kind: wechatReplyNone}
 	case "text":
 		code := normalizeWeChatCode(msg.Content)
-		if code == "" {
-			return ""
+		if looksLikeWeChatCode(code) {
+			return wechatReply{kind: wechatReplyText, text: h.completeWeChatByCode(code, msg.FromUserName)}
 		}
-		return h.completeWeChatByCode(code, msg.FromUserName)
+		// Not a login code — let the official AI handle it (or stay silent).
+		return h.aiOrSilentReply()
 	default:
-		return ""
+		return h.aiOrSilentReply()
 	}
+}
+
+// aiOrSilentReply hands off to the official AI reply when enabled, otherwise
+// acknowledges without a message.
+func (h *AuthHandler) aiOrSilentReply() wechatReply {
+	if h.cfg.WeChatAIReply {
+		return wechatReply{kind: wechatReplyAITransfer}
+	}
+	return wechatReply{kind: wechatReplyNone}
 }
 
 // completeWeChatByCode matches a code to a pending session and performs the
@@ -348,18 +388,33 @@ func (h *AuthHandler) linkWeChatToUser(userID uuid.UUID, openid string) error {
 	return nil
 }
 
-// writeWeChatReply sends a passive text reply, encrypting it when the callback
-// arrived in 安全/兼容 mode. Empty replyText (or a misconfiguration) acks "success".
-func (h *AuthHandler) writeWeChatReply(c *gin.Context, msg *wechatEventMessage, replyText, timestamp, nonce string, encrypted bool) {
-	if replyText == "" {
+// writeWeChatReply sends the chosen passive reply, encrypting it when the
+// callback arrived in 安全/兼容 mode. A "none" reply (or a misconfiguration)
+// acks "success" so WeChat stops retrying.
+func (h *AuthHandler) writeWeChatReply(c *gin.Context, msg *wechatEventMessage, reply wechatReply, timestamp, nonce string, encrypted bool) {
+	now := time.Now().Unix()
+
+	var plainXML string
+	switch reply.kind {
+	case wechatReplyText:
+		if reply.text == "" {
+			c.String(http.StatusOK, "success")
+			return
+		}
+		plainXML = fmt.Sprintf(
+			`<xml><ToUserName><![CDATA[%s]]></ToUserName><FromUserName><![CDATA[%s]]></FromUserName><CreateTime>%d</CreateTime><MsgType><![CDATA[text]]></MsgType><Content><![CDATA[%s]]></Content></xml>`,
+			msg.FromUserName, msg.ToUserName, now, reply.text,
+		)
+	case wechatReplyAITransfer:
+		// Hand the message to WeChat's official AI reply.
+		plainXML = fmt.Sprintf(
+			`<xml><ToUserName><![CDATA[%s]]></ToUserName><FromUserName><![CDATA[%s]]></FromUserName><CreateTime>%d</CreateTime><MsgType><![CDATA[transfer_biz_ai_ivr]]></MsgType></xml>`,
+			msg.FromUserName, msg.ToUserName, now,
+		)
+	default:
 		c.String(http.StatusOK, "success")
 		return
 	}
-
-	plainXML := fmt.Sprintf(
-		`<xml><ToUserName><![CDATA[%s]]></ToUserName><FromUserName><![CDATA[%s]]></FromUserName><CreateTime>%d</CreateTime><MsgType><![CDATA[text]]></MsgType><Content><![CDATA[%s]]></Content></xml>`,
-		msg.FromUserName, msg.ToUserName, time.Now().Unix(), replyText,
-	)
 
 	if encrypted {
 		if !h.wechatSvc.EncryptedMode() {

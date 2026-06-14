@@ -55,6 +55,11 @@ type Config struct {
 	// WeChatAccountName is the Official Account's display name, shown as a
 	// fallback / hint so users can search for it. Optional.
 	WeChatAccountName string
+	// WeChatAIReply, when true, makes the callback hand non-login messages back
+	// to WeChat's official AI reply (passive reply MsgType=transfer_biz_ai_ivr),
+	// so enabling 开发模式 doesn't disable the account's AI auto-reply. Requires
+	// the Official Account to have AI reply enabled (currently a gray release).
+	WeChatAIReply bool
 
 	// Wallpaper source: Wallhaven
 	WallhavenAPIKey string
@@ -155,6 +160,7 @@ func Load() *Config {
 		WeChatAESKey:      getEnv("WECHAT_AES_KEY", ""),
 		WeChatQRImageURL:  getEnv("WECHAT_QR_IMAGE_URL", ""),
 		WeChatAccountName: getEnv("WECHAT_ACCOUNT_NAME", ""),
+		WeChatAIReply:     getEnv("WECHAT_AI_REPLY", "") == "true",
 
 		WallhavenAPIKey: getEnv("WALLHAVEN_API_KEY", ""),
 		WallhavenPurity: getEnv("WALLHAVEN_PURITY", "sfw"),

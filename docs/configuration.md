@@ -39,6 +39,7 @@ All backend services are configured via environment variables. Every setting is 
 | `WECHAT_AES_KEY` | *(empty)* | 43-char EncodingAESKey — only for 安全/兼容 mode (empty = 明文 mode) |
 | `WECHAT_QR_IMAGE_URL` | *(empty)* | URL to the account's permanent QR image (optional) |
 | `WECHAT_ACCOUNT_NAME` | *(empty)* | Account display name shown as a search hint (optional) |
+| `WECHAT_AI_REPLY` | *(empty)* | `true` = hand non-login messages back to the official AI reply (keeps AI working in 开发模式) |
 | **Wallpaper** | | |
 | `WALLHAVEN_API_KEY` | *(empty)* | Wallhaven API key (optional; SFW works without it) |
 | `WALLHAVEN_PURITY` | `sfw` | Allowed purity levels: `sfw`, `sketchy`, `nsfw` (comma-separated) |
@@ -246,10 +247,28 @@ WECHAT_AES_KEY=
 WECHAT_QR_IMAGE_URL=
 # 选填：公众号名称，没有二维码图片时提示用户搜索关注
 WECHAT_ACCOUNT_NAME=
+# 选填：设为 true，把"非验证码"消息交还官方AI回复（见下方"保留官方AI"）
+WECHAT_AI_REPLY=
 ```
 
 > 公众号的永久二维码：公众号后台首页/账号详情可下载，把图片托管到任意可访问地址（如对象存储），填到
 > `WECHAT_QR_IMAGE_URL`。不填则前端提示用户按 `WECHAT_ACCOUNT_NAME` 搜索关注。
+
+### 保留官方AI回复 / Keep the official AI reply
+
+启用「服务器配置（开发模式）」后，**所有**用户消息只发到你的服务器，公众号后台的「AI回复 / 自动回复 / 自定义菜单」默认失效（一条消息只能投递到一个地方）。
+
+设置 `WECHAT_AI_REPLY=true` 后，回调会这样分流：
+
+- 消息**长得像验证码**（6 位、限定字符集）→ 走登录/绑定；
+- **其它任何消息** → 回复被动消息 `MsgType=transfer_biz_ai_ivr`，把消息**交还给微信官方AI回复**。
+
+这样「扫码登录」和「官方AI自动回复」就能在同一个公众号上并存。
+
+> 前提（微信侧）：公众号需已开启**官方AI回复**功能且AI已学习完历史文章；该能力目前在**灰度**中。
+> 参考：[被动回复用户消息 · 转接AI回复](https://developers.weixin.qq.com/doc/subscription/guide/product/message/Passive_user_reply_message.html)
+>
+> 留空 / 不设 `WECHAT_AI_REPLY` 时，非验证码消息不自动回复（只保证登录可用）。
 
 ### Flow / 登录流程
 
