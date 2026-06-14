@@ -37,7 +37,7 @@ All backend services are configured via environment variables. Every setting is 
 | `WECHAT_TOKEN` | *(empty)* | Token from 服务器配置 (callback signature) — **enables WeChat login** |
 | `WECHAT_APP_ID` | *(empty)* | Official Account AppID — optional, only for 安全/兼容 mode |
 | `WECHAT_AES_KEY` | *(empty)* | 43-char EncodingAESKey — only for 安全/兼容 mode (empty = 明文 mode) |
-| `WECHAT_QR_IMAGE_URL` | *(empty)* | URL to the account's permanent QR image (optional) |
+| `WECHAT_QR_IMAGE_URL` | *(empty)* | Optional runtime override of the bundled QR asset (`frontend/src/assets/wechat-qr.png`) |
 | `WECHAT_ACCOUNT_NAME` | *(empty)* | Account display name shown as a search hint (optional) |
 | `WECHAT_AI_REPLY` | *(empty)* | `true` = hand non-login messages back to the official AI reply (keeps AI working in 开发模式) |
 | **Wallpaper** | | |
@@ -251,8 +251,9 @@ WECHAT_ACCOUNT_NAME=
 WECHAT_AI_REPLY=
 ```
 
-> 公众号的永久二维码：公众号后台首页/账号详情可下载，把图片托管到任意可访问地址（如对象存储），填到
-> `WECHAT_QR_IMAGE_URL`。不填则前端提示用户按 `WECHAT_ACCOUNT_NAME` 搜索关注。
+> 公众号永久二维码：前端已内置一张二维码图片 `frontend/src/assets/wechat-qr.png`，
+> 把它替换成你自己公众号的二维码即可（构建时自动打包）。如需运行时覆盖，可把图片托管后填到
+> `WECHAT_QR_IMAGE_URL`。
 
 ### 保留官方AI回复 / Keep the official AI reply
 
