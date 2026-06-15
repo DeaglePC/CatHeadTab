@@ -383,7 +383,11 @@ export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         </div>
 
         {/* Content */}
-        <div ref={contentRef} className="flex-1 overflow-y-auto p-8 desktop-scrollbar">
+        <div className="flex-1 overflow-y-auto desktop-scrollbar">
+        {/* Inner wrapper measured for auto-resize — its natural height is independent
+            of the stretched flex parent, so the window shrinks when switching to a
+            shorter view (e.g. register → login) instead of leaving a blank gap. */}
+        <div ref={contentRef} className="p-8">
         {/* ===== Step 1: Server URL Configuration ===== */}
         {step === 'server' && (
           <>
@@ -663,6 +667,7 @@ export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             )}
           </>
         )}
+        </div>
         </div>
         {floatingWindow.resizeHandle}
       </div>
