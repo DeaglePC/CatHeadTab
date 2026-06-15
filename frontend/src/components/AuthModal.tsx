@@ -311,7 +311,7 @@ export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   const showOAuth = oauthConfig && (oauthConfig.github_client_id || oauthConfig.google_client_id || oauthConfig.wechat_enabled);
 
-  useLayoutEffect(() => {
+  const measureAndResize = useCallback(() => {
     if (typeof window === 'undefined' || window.innerWidth < 640) return;
     const headerElement = headerRef.current;
     const contentElement = contentRef.current;
@@ -327,7 +327,24 @@ export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       width: currentSize.width,
       height: nextHeight,
     }));
-  }, [cooldown, error, floatingWindow.setWindowSize, password, showOAuth, step, success, view]);
+  }, [floatingWindow.setWindowSize]);
+
+  // Re-measure synchronously when the rendered content changes (view switches,
+  // errors, password indicator, etc.), AND observe the content box so async
+  // views resize too — e.g. WeChat scan login grows the content after its
+  // session loads (loading spinner → QR + verification code), long after the
+  // `view` switch that a fixed dependency list keys off. The ResizeObserver is
+  // the part that fixes WeChat; the deps keep the immediate resize (and cover
+  // browsers without ResizeObserver).
+  useLayoutEffect(() => {
+    const contentElement = contentRef.current;
+    if (!contentElement) return;
+    measureAndResize();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => measureAndResize());
+    observer.observe(contentElement);
+    return () => observer.disconnect();
+  }, [measureAndResize, step, view, error, success, cooldown, password, showOAuth]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none p-4 sm:p-12" onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}>
