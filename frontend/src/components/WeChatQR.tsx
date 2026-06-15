@@ -177,6 +177,7 @@ export const WeChatQR: React.FC<WeChatQRProps> = ({ mode, onSuccess }) => {
               {copied ? t('auth.wechatCopied') : t('auth.wechatCopy')}
             </button>
           </div>
+          <span className="text-white/30 text-[11px]">{t('auth.wechatCodeCaseInsensitive')}</span>
         </div>
       )}
 

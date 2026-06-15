@@ -192,6 +192,7 @@ export const zh = {
   'auth.wechatCodeLabel': '验证码',
   'auth.wechatCopy': '复制',
   'auth.wechatCopied': '已复制',
+  'auth.wechatCodeCaseInsensitive': '不区分大小写',
   'auth.wechatFollowHint': '发送验证码后将自动登录',
   'auth.wechatExpired': '验证码已过期',
   'auth.wechatRefresh': '刷新',

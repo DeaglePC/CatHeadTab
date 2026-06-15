@@ -192,6 +192,7 @@ export const en = {
   'auth.wechatCodeLabel': 'Verification code',
   'auth.wechatCopy': 'Copy',
   'auth.wechatCopied': 'Copied',
+  'auth.wechatCodeCaseInsensitive': 'Not case-sensitive',
   'auth.wechatFollowHint': "You'll be signed in automatically after sending the code",
   'auth.wechatExpired': 'Code expired',
   'auth.wechatRefresh': 'Refresh',
