@@ -52,6 +52,9 @@ export const ProfileModal: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   const [oauthConfig, setOAuthConfig] = useState<{ github_client_id: string; google_client_id: string; oauth_callback_url: string; wechat_enabled?: boolean } | null>(null);
   // WeChat bind QR overlay
   const [showWeChatBind, setShowWeChatBind] = useState(false);
+  // Account deletion (typed confirmation)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   // Avatar upload
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -296,6 +299,20 @@ export const ProfileModal: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     if (window.confirm(t('profile.logoutWarning'))) {
       logout();
       onClose();
+    }
+  };
+
+  // Permanently delete the account, then sign out locally.
+  const handleDeleteAccount = async () => {
+    setLoadingAction('Delete');
+    setErrorMsg('');
+    try {
+      await client.delete('/api/v1/user');
+      logout();
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || t('profile.deleteAccountFailed'));
+      setLoadingAction(null);
     }
   };
 
@@ -674,12 +691,53 @@ export const ProfileModal: React.FC<{ onClose: () => void }> = ({ onClose }) => 
             </button>
           </div>
 
-          <button 
+          <button
             onClick={handleLogout}
             className="w-full py-3.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-500 font-bold transition-colors"
           >
             {t('profile.signOut')}
           </button>
+
+          {/* Danger zone: permanent account deletion */}
+          <div className="mt-3 pt-3 border-t border-white/10">
+            {!showDeleteConfirm ? (
+              <button
+                onClick={() => { setShowDeleteConfirm(true); setDeleteConfirmText(''); setErrorMsg(''); }}
+                className="w-full py-2.5 text-red-400/70 hover:text-red-400 text-[13px] font-medium transition-colors"
+              >
+                {t('profile.deleteAccount')}
+              </button>
+            ) : (
+              <div className="rounded-xl bg-red-500/5 border border-red-500/20 p-4 space-y-3">
+                <p className="text-[13px] text-red-400 font-bold">{t('profile.deleteAccount')}</p>
+                <p className="text-[12px] text-white/50 leading-relaxed">{t('profile.deleteAccountDesc')}</p>
+                <p className="text-[12px] text-white/60">{t('profile.deleteAccountConfirm', { username: userProfile?.username || '' })}</p>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={e => setDeleteConfirmText(e.target.value)}
+                  placeholder={userProfile?.username || ''}
+                  autoComplete="off"
+                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[14px] text-white focus:outline-none focus:border-red-500/50 transition-colors"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}
+                    className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 font-medium text-[13px] transition-colors"
+                  >
+                    {t('settings.cancel')}
+                  </button>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={loadingAction === 'Delete' || !userProfile?.username || deleteConfirmText !== userProfile.username}
+                    className="flex-1 py-2.5 rounded-xl bg-red-500/80 hover:bg-red-500 text-white font-bold text-[13px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {loadingAction === 'Delete' ? t('auth.processing') : t('profile.deleteAccountButton')}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         {floatingWindow.resizeHandle}
       </div>

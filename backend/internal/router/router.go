@@ -205,6 +205,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 			user.GET("/preferences", userHandler.GetPreferences)
 			user.PUT("/preferences", userHandler.UpdatePreferences)
 
+			// Account deletion (irreversible; the only exit for single-login accounts)
+			user.DELETE("", userHandler.DeleteAccount)
+
 			// Avatar upload/delete (no email verification required)
 			user.POST("/avatar", userHandler.UploadAvatar)
 			user.DELETE("/avatar", userHandler.DeleteAvatar)
