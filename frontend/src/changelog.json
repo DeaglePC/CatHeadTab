@@ -1,5 +1,25 @@
 [
   {
+    "version": "1.0.5",
+    "date": "2026-06-20",
+    "zh": [
+      "新增微信公众号扫码登录，并支持与已有账号绑定",
+      "新增自助注销账号功能，可在设置中永久删除账号",
+      "优化登录弹窗：根据内容自动调整尺寸，并消除打开动画期间残留的滚动条",
+      "修复浮动窗口在自适应内容尺寸时未保持居中的问题",
+      "修复折叠文件夹预览图标与展开后渲染不一致的问题",
+      "将网站图标更换为品牌 Logo"
+    ],
+    "en": [
+      "Added WeChat Official Account scan-to-login, with binding to an existing account",
+      "Added self-service account deletion to permanently remove your account from Settings",
+      "Auth dialog now auto-sizes to its content and no longer shows a stray scrollbar during the open animation",
+      "Fixed floating windows not staying centered when auto-fitting to their content",
+      "Fixed collapsed folder preview icons not matching their in-folder rendering",
+      "Switched the site favicon to the brand logo"
+    ]
+  },
+  {
     "version": "1.0.4",
     "date": "2026-06-13",
     "zh": [
