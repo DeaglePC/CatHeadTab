@@ -28,8 +28,6 @@ const (
 	wechatSessionIDBytes = 32
 	// wechatCodeCharset excludes visually ambiguous characters (0/O, 1/I/L).
 	wechatCodeCharset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-	// wechatWelcomeText is the passive reply sent when a user follows the account.
-	wechatWelcomeText = "欢迎关注！请把网页上显示的验证码发送给我，即可完成登录 😊"
 )
 
 // wechatEventMessage is the subset of the WeChat callback XML we handle. It
@@ -285,10 +283,8 @@ func (h *AuthHandler) WeChatCallback(c *gin.Context) {
 func (h *AuthHandler) handleWeChatMessage(msg *wechatEventMessage) wechatReply {
 	switch msg.MsgType {
 	case "event":
-		// New followers get a welcome that explains the next step.
-		if msg.Event == "subscribe" {
-			return wechatReply{kind: wechatReplyText, text: wechatWelcomeText}
-		}
+		// Events (including new follows) are acknowledged silently — the web
+		// flow already tells the user to send the code shown on the page.
 		return wechatReply{kind: wechatReplyNone}
 	case "text":
 		code := normalizeWeChatCode(msg.Content)
