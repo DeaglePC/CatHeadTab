@@ -47,11 +47,11 @@ export const WeChatQR: React.FC<WeChatQRProps> = ({ mode, onSuccess }) => {
     }
   }, []);
 
-  const startPolling = useCallback((c: string) => {
+  const startPolling = useCallback((sessionId: string) => {
     stopPolling();
     pollRef.current = setInterval(async () => {
       try {
-        const res = await client.get('/api/v1/auth/wechat/poll', { params: { code: c } });
+        const res = await client.get('/api/v1/auth/wechat/poll', { params: { session: sessionId } });
         const data = res.data;
         if (data.status === 'confirmed') {
           stopPolling();
@@ -91,7 +91,7 @@ export const WeChatQR: React.FC<WeChatQRProps> = ({ mode, onSuccess }) => {
       setQrImageUrl(res.data.qr_image_url || '');
       setAccountName(res.data.account_name || '');
       setStatus('pending');
-      startPolling(res.data.code);
+      startPolling(res.data.session);
     } catch (err: any) {
       setStatus('error');
       setErrorMsg(err.response?.data?.error || t('auth.wechatFailed'));

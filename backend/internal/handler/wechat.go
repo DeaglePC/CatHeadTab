@@ -24,6 +24,8 @@ const (
 	wechatProvider = "wechat"
 	// wechatCodeLen is the length of the verification code the user types.
 	wechatCodeLen = 6
+	// wechatSessionIDBytes is the entropy (in bytes) of the opaque polling id.
+	wechatSessionIDBytes = 32
 	// wechatCodeCharset excludes visually ambiguous characters (0/O, 1/I/L).
 	wechatCodeCharset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	// wechatWelcomeText is the passive reply sent when a user follows the account.
@@ -94,6 +96,18 @@ func normalizeWeChatCode(s string) string {
 	return strings.ToUpper(strings.TrimSpace(s))
 }
 
+// generateWeChatSessionID returns an opaque, high-entropy id the browser uses
+// to poll login status. Unlike the human code, it is never shown to the user
+// nor sent through WeChat, so the resulting token cannot be claimed by
+// guessing or replaying the short verification code.
+func generateWeChatSessionID() (string, error) {
+	b := make([]byte, wechatSessionIDBytes)
+	if _, err := crand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
 // WeChatLogin starts a login by issuing a verification code (public).
 // POST /api/v1/auth/wechat/login
 func (h *AuthHandler) WeChatLogin(c *gin.Context) {
@@ -128,7 +142,7 @@ func (h *AuthHandler) startWeChatSession(c *gin.Context, mode service.WeChatSess
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create login session"})
 			return
 		}
-		if _, exists := h.wechatSessions.Get(candidate); !exists {
+		if !h.wechatSessions.CodeExists(candidate) {
 			code = candidate
 			break
 		}
@@ -138,28 +152,39 @@ func (h *AuthHandler) startWeChatSession(c *gin.Context, mode service.WeChatSess
 		return
 	}
 
-	h.wechatSessions.Create(code, mode, userID, wechatCodeTTL)
+	// The browser polls with this opaque id, never with the human code.
+	sessionID, err := generateWeChatSessionID()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create login session"})
+		return
+	}
+
+	h.wechatSessions.Create(code, sessionID, mode, userID, wechatCodeTTL)
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":           code,
+		"session":        sessionID,
 		"expire_seconds": int(wechatCodeTTL.Seconds()),
 		"qr_image_url":   h.cfg.WeChatQRImageURL,
 		"account_name":   h.cfg.WeChatAccountName,
 	})
 }
 
-// WeChatPoll reports the status of a pending login/link.
-// GET /api/v1/auth/wechat/poll?code=...
+// WeChatPoll reports the status of a pending login/link. It is keyed by the
+// opaque session id returned at issuance, not the human verification code, so
+// the confirmed token can only be retrieved by the browser that started the
+// flow.
+// GET /api/v1/auth/wechat/poll?session=...
 func (h *AuthHandler) WeChatPoll(c *gin.Context) {
-	code := normalizeWeChatCode(c.Query("code"))
-	if code == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing code"})
+	sessionID := strings.TrimSpace(c.Query("session"))
+	if sessionID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing session"})
 		return
 	}
 
-	sess, ok := h.wechatSessions.Get(code)
+	sess, ok := h.wechatSessions.GetBySessionID(sessionID)
 	if !ok {
-		// Unknown code — already reaped or never existed; treat as expired.
+		// Unknown session — already reaped or never existed; treat as expired.
 		c.JSON(http.StatusOK, gin.H{"status": "expired"})
 		return
 	}

@@ -276,9 +276,10 @@ WECHAT_AI_REPLY=
 ```
 User clicks "Continue with WeChat"
     ↓
-Frontend: POST /api/v1/auth/wechat/login → { code, qr_image_url, account_name }
+Frontend: POST /api/v1/auth/wechat/login → { code, session, qr_image_url, account_name }
     ↓
-Frontend shows the account QR + the code, polls GET /api/v1/auth/wechat/poll?code=...
+Frontend shows the account QR + the code, polls GET /api/v1/auth/wechat/poll?session=...
+(session is an opaque high-entropy id; the human code is only sent to WeChat, never used to poll)
     ↓
 User follows the account, then sends the code in the chat
     ↓
