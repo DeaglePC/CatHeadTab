@@ -317,8 +317,12 @@ export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const contentElement = contentRef.current;
     if (!headerElement || !contentElement) return;
 
+    // offsetHeight (layout box), not getBoundingClientRect (visual box): the
+    // window plays a scaleIn transform on open, and a transformed bounding rect
+    // would report the header a few px shorter than its laid-out height, fitting
+    // the window too small and leaving a stray scrollbar until the next resize.
     const nextHeight = Math.ceil(
-      headerElement.getBoundingClientRect().height
+      headerElement.offsetHeight
       + contentElement.scrollHeight
       + 2,
     );

@@ -693,8 +693,12 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({ onClose, pageInd
     }, 0);
     const measuredContentHeight = Math.max(bottomMostChild + paddingBottom, 0);
 
+    // offsetHeight (layout box), not getBoundingClientRect (visual box): the
+    // window plays a scaleIn transform on open, and a transformed bounding rect
+    // would report the header a few px shorter than its laid-out height, fitting
+    // the window too small and leaving a stray scrollbar until the next resize.
     const nextHeight = Math.ceil(
-      headerElement.getBoundingClientRect().height
+      headerElement.offsetHeight
       + measuredContentHeight
       + 2,
     );
