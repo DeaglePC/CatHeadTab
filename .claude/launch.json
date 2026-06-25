@@ -6,7 +6,8 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "cwd": "frontend",
-      "port": 5173
+      "port": 5173,
+      "autoPort": true
     },
     {
       "name": "backend (Go API)",

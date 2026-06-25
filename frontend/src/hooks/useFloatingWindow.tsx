@@ -156,16 +156,27 @@ export function useFloatingWindow(options: UseFloatingWindowOptions) {
   const setWindowSize = useCallback((nextSizeInput: FloatingWindowSizeInput) => {
     if (disabled || isFullscreen) return;
 
+    const previousSize = sizeRef.current;
+    const previousPosition = positionRef.current;
     const nextRawSize = typeof nextSizeInput === 'function'
-      ? nextSizeInput(sizeRef.current)
+      ? nextSizeInput(previousSize)
       : nextSizeInput;
     const nextSize = clampSize(nextRawSize, minWidth, minHeight, viewportMargin);
-    const nextPosition = clampPosition(positionRef.current, nextSize, viewportMargin);
+    // Programmatic resizes (auto-fit to content) grow/shrink around the window's
+    // current center, so a window that was centered stays centered instead of
+    // anchoring its top and drifting downward as the content gets taller. Pointer
+    // resizing keeps its own top-left anchored path in handleResizePointerDown.
+    const centerX = previousPosition.left + previousSize.width / 2;
+    const centerY = previousPosition.top + previousSize.height / 2;
+    const nextPosition = clampPosition({
+      left: Math.round(centerX - nextSize.width / 2),
+      top: Math.round(centerY - nextSize.height / 2),
+    }, nextSize, viewportMargin);
     if (
-      Math.round(nextSize.width) === Math.round(sizeRef.current.width)
-      && Math.round(nextSize.height) === Math.round(sizeRef.current.height)
-      && Math.round(nextPosition.left) === Math.round(positionRef.current.left)
-      && Math.round(nextPosition.top) === Math.round(positionRef.current.top)
+      Math.round(nextSize.width) === Math.round(previousSize.width)
+      && Math.round(nextSize.height) === Math.round(previousSize.height)
+      && Math.round(nextPosition.left) === Math.round(previousPosition.left)
+      && Math.round(nextPosition.top) === Math.round(previousPosition.top)
     ) {
       return;
     }

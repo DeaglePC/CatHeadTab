@@ -5,12 +5,13 @@ import { useTranslation } from '../i18n/useTranslation';
 import { isPasswordAcceptable } from '../utils/passwordStrength';
 import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
 import { useFloatingWindow } from '../hooks/useFloatingWindow';
+import { WeChatQR } from './WeChatQR';
 
 // 参考 Twitter 规则：4-15 字符，只允许字母、数字、下划线
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{4,15}$/;
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
 
-type AuthView = 'login' | 'register' | 'forgot' | 'verify-pending';
+type AuthView = 'login' | 'register' | 'forgot' | 'verify-pending' | 'wechat';
 type ModalStep = 'server' | 'auth';
 
 export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
@@ -49,7 +50,7 @@ export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [oauthConfig, setOAuthConfig] = useState<{ github_client_id: string; google_client_id: string; oauth_callback_url: string } | null>(null);
+  const [oauthConfig, setOAuthConfig] = useState<{ github_client_id: string; google_client_id: string; oauth_callback_url: string; wechat_enabled?: boolean } | null>(null);
   const [pendingEmail, setPendingEmail] = useState('');
 
   // Rate limit countdown
@@ -279,6 +280,20 @@ export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     }, 500);
   };
 
+  // WeChat scan login confirmed — store the token and fetch the profile,
+  // mirroring the OAuth success path.
+  const handleWeChatSuccess = async (data?: { token: string; user: unknown }) => {
+    if (!data) return;
+    setJwtToken(data.token);
+    try {
+      const profileRes = await client.get('/api/v1/user/profile');
+      setUserProfile(profileRes.data);
+    } catch {
+      // Profile fetch will be retried by App.tsx useEffect
+    }
+    onClose();
+  };
+
   const switchView = (newView: AuthView) => {
     setView(newView);
     setError('');
@@ -294,16 +309,20 @@ export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     }
   };
 
-  const showOAuth = oauthConfig && (oauthConfig.github_client_id || oauthConfig.google_client_id);
+  const showOAuth = oauthConfig && (oauthConfig.github_client_id || oauthConfig.google_client_id || oauthConfig.wechat_enabled);
 
-  useLayoutEffect(() => {
+  const measureAndResize = useCallback(() => {
     if (typeof window === 'undefined' || window.innerWidth < 640) return;
     const headerElement = headerRef.current;
     const contentElement = contentRef.current;
     if (!headerElement || !contentElement) return;
 
+    // offsetHeight (layout box), not getBoundingClientRect (visual box): the
+    // window plays a scaleIn transform on open, and a transformed bounding rect
+    // would report the header a few px shorter than its laid-out height, fitting
+    // the window too small and leaving a stray scrollbar until the next resize.
     const nextHeight = Math.ceil(
-      headerElement.getBoundingClientRect().height
+      headerElement.offsetHeight
       + contentElement.scrollHeight
       + 2,
     );
@@ -312,7 +331,24 @@ export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       width: currentSize.width,
       height: nextHeight,
     }));
-  }, [cooldown, error, floatingWindow.setWindowSize, password, showOAuth, step, success, view]);
+  }, [floatingWindow.setWindowSize]);
+
+  // Re-measure synchronously when the rendered content changes (view switches,
+  // errors, password indicator, etc.), AND observe the content box so async
+  // views resize too — e.g. WeChat scan login grows the content after its
+  // session loads (loading spinner → QR + verification code), long after the
+  // `view` switch that a fixed dependency list keys off. The ResizeObserver is
+  // the part that fixes WeChat; the deps keep the immediate resize (and cover
+  // browsers without ResizeObserver).
+  useLayoutEffect(() => {
+    const contentElement = contentRef.current;
+    if (!contentElement) return;
+    measureAndResize();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => measureAndResize());
+    observer.observe(contentElement);
+    return () => observer.disconnect();
+  }, [measureAndResize, step, view, error, success, cooldown, password, showOAuth]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none p-4 sm:p-12" onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}>
@@ -353,9 +389,10 @@ export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           {/* Center title */}
           <div className="flex-1 flex justify-center">
             <span className="text-[13px] font-semibold text-white/70">
-              {step === 'server' ? t('auth.serverSetupTitle') : 
+              {step === 'server' ? t('auth.serverSetupTitle') :
                view === 'forgot' ? t('auth.forgotPassword') :
                view === 'verify-pending' ? t('auth.emailNotVerifiedTitle') :
+               view === 'wechat' ? t('auth.wechat') :
                t('auth.signIn')}
             </span>
           </div>
@@ -367,7 +404,11 @@ export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         </div>
 
         {/* Content */}
-        <div ref={contentRef} className="flex-1 overflow-y-auto p-8 desktop-scrollbar">
+        <div className="flex-1 overflow-y-auto desktop-scrollbar">
+        {/* Inner wrapper measured for auto-resize — its natural height is independent
+            of the stretched flex parent, so the window shrinks when switching to a
+            shorter view (e.g. register → login) instead of leaving a blank gap. */}
+        <div ref={contentRef} className="p-8">
         {/* ===== Step 1: Server URL Configuration ===== */}
         {step === 'server' && (
           <>
@@ -401,7 +442,7 @@ export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         )}
 
         {/* ===== Step 2: Auth (Login / Register / Forgot / Verify-Pending) ===== */}
-        {step === 'auth' && view !== 'forgot' && view !== 'verify-pending' && (
+        {step === 'auth' && view !== 'forgot' && view !== 'verify-pending' && view !== 'wechat' && (
           <div className="flex justify-center mb-6">
             <div className="bg-black/40 backdrop-blur-xl p-1 rounded-full flex gap-1 border border-white/10">
               <button 
@@ -467,7 +508,21 @@ export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </div>
         )}
 
-        {step === 'auth' && view !== 'verify-pending' && (
+        {/* WeChat scan login */}
+        {step === 'auth' && view === 'wechat' && (
+          <div className="flex flex-col items-center gap-4">
+            <WeChatQR mode="login" onSuccess={handleWeChatSuccess} />
+            <button
+              type="button"
+              onClick={() => switchView('login')}
+              className="text-white/40 hover:text-white/70 text-[13px] transition-colors"
+            >
+              ← {t('auth.backToLogin')}
+            </button>
+          </div>
+        )}
+
+        {step === 'auth' && view !== 'verify-pending' && view !== 'wechat' && (
           <>
             {error && <div className="mb-4 text-red-500 text-[13px] font-medium text-center bg-red-500/10 p-3 rounded-xl border border-red-500/20">{error}</div>}
             {success && <div className="mb-4 text-[#72d565] text-[13px] font-medium text-center bg-[#72d565]/10 p-3 rounded-xl border border-[#72d565]/20">{success}</div>}
@@ -617,11 +672,23 @@ export const AuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                       {t('auth.google')}
                     </button>
                   )}
+                  {oauthConfig?.wechat_enabled && (
+                    <button
+                      type="button"
+                      onClick={() => switchView('wechat')}
+                      disabled={loading}
+                      className="w-full py-3 rounded-xl bg-[#07c160] hover:bg-[#06ad56] border border-white/10 text-white font-bold transition-colors flex items-center justify-center gap-3 disabled:opacity-50"
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 4.882-1.932 7.621-.55C20.811 6.5 16.873 2.188 8.691 2.188zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.111 2.351-.348a.825.825 0 0 1 .654.087l1.546.902a.272.272 0 0 0 .136.045c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.318-1.21a.49.49 0 0 1 .178-.554c1.526-1.124 2.514-2.81 2.514-4.7 0-3.366-3.219-6.09-7.192-6.45a8.29 8.29 0 0 0-.295-.003zm-3.151 1.99c.534 0 .967.44.967.982a.976.976 0 0 1-.967.982.976.976 0 0 1-.967-.982c0-.542.433-.982.967-.982zm4.84 0c.534 0 .967.44.967.982a.976.976 0 0 1-.967.982.976.976 0 0 1-.968-.982c0-.542.434-.982.968-.982z"/></svg>
+                      {t('auth.wechat')}
+                    </button>
+                  )}
                 </div>
               </>
             )}
           </>
         )}
+        </div>
         </div>
         {floatingWindow.resizeHandle}
       </div>

@@ -7,6 +7,7 @@ import { isPasswordAcceptable } from '../utils/passwordStrength';
 import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
 import client from '../api/client';
 import { useFloatingWindow } from '../hooks/useFloatingWindow';
+import { WeChatQR } from './WeChatQR';
 
 interface LinkedAccount {
   provider: string;
@@ -48,7 +49,12 @@ export const ProfileModal: React.FC<{ onClose: () => void }> = ({ onClose }) => 
 
   // Linked accounts
   const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
-  const [oauthConfig, setOAuthConfig] = useState<{ github_client_id: string; google_client_id: string; oauth_callback_url: string } | null>(null);
+  const [oauthConfig, setOAuthConfig] = useState<{ github_client_id: string; google_client_id: string; oauth_callback_url: string; wechat_enabled?: boolean } | null>(null);
+  // WeChat bind QR overlay
+  const [showWeChatBind, setShowWeChatBind] = useState(false);
+  // Account deletion (typed confirmation)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   // Avatar upload
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -217,6 +223,19 @@ export const ProfileModal: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     }
   };
 
+  // WeChat scan-to-bind confirmed — refresh the linked accounts list.
+  const handleWeChatBindSuccess = async () => {
+    setShowWeChatBind(false);
+    try {
+      const res = await client.get('/api/v1/user/linked-accounts');
+      setLinkedAccounts(res.data.accounts || []);
+      setSuccessMsg(t('profile.accountLinked'));
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch {
+      // Non-fatal; the list will refresh on next open.
+    }
+  };
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -280,6 +299,20 @@ export const ProfileModal: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     if (window.confirm(t('profile.logoutWarning'))) {
       logout();
       onClose();
+    }
+  };
+
+  // Permanently delete the account, then sign out locally.
+  const handleDeleteAccount = async () => {
+    setLoadingAction('Delete');
+    setErrorMsg('');
+    try {
+      await client.delete('/api/v1/user');
+      logout();
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || t('profile.deleteAccountFailed'));
+      setLoadingAction(null);
     }
   };
 
@@ -496,6 +529,36 @@ export const ProfileModal: React.FC<{ onClose: () => void }> = ({ onClose }) => 
                 </button>
               )}
             </div>
+
+            {/* WeChat */}
+            <div className="flex items-center justify-between rounded-xl bg-white/5 border border-white/10 p-4">
+              <div className="flex items-center gap-3">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="#07c160"><path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 4.882-1.932 7.621-.55C20.811 6.5 16.873 2.188 8.691 2.188zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.111 2.351-.348a.825.825 0 0 1 .654.087l1.546.902a.272.272 0 0 0 .136.045c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.318-1.21a.49.49 0 0 1 .178-.554c1.526-1.124 2.514-2.81 2.514-4.7 0-3.366-3.219-6.09-7.192-6.45a8.29 8.29 0 0 0-.295-.003zm-3.151 1.99c.534 0 .967.44.967.982a.976.976 0 0 1-.967.982.976.976 0 0 1-.967-.982c0-.542.433-.982.967-.982zm4.84 0c.534 0 .967.44.967.982a.976.976 0 0 1-.967.982.976.976 0 0 1-.968-.982c0-.542.434-.982.968-.982z"/></svg>
+                <div>
+                  <span className="text-white font-medium text-[14px]">{t('profile.wechat')}</span>
+                  {isLinked('wechat') && (
+                    <p className="text-white/40 text-[12px]">{getLinked('wechat')?.provider_username || t('profile.wechatLinked')}</p>
+                  )}
+                </div>
+              </div>
+              {isLinked('wechat') ? (
+                <button
+                  onClick={() => handleUnlinkOAuth('wechat')}
+                  disabled={!!loadingAction}
+                  className="text-red-400 text-[12px] font-medium hover:text-red-300 transition-colors disabled:opacity-50"
+                >
+                  {t('profile.unlink')}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowWeChatBind(true)}
+                  disabled={!!loadingAction || !oauthConfig?.wechat_enabled}
+                  className="text-blue-400 text-[12px] font-medium hover:text-blue-300 transition-colors disabled:opacity-50"
+                >
+                  {oauthConfig?.wechat_enabled ? t('profile.link') : t('profile.notConfigured')}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Change Password Section */}
@@ -628,15 +691,72 @@ export const ProfileModal: React.FC<{ onClose: () => void }> = ({ onClose }) => 
             </button>
           </div>
 
-          <button 
+          <button
             onClick={handleLogout}
             className="w-full py-3.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-500 font-bold transition-colors"
           >
             {t('profile.signOut')}
           </button>
+
+          {/* Danger zone: permanent account deletion */}
+          <div className="mt-3 pt-3 border-t border-white/10">
+            {!showDeleteConfirm ? (
+              <button
+                onClick={() => { setShowDeleteConfirm(true); setDeleteConfirmText(''); setErrorMsg(''); }}
+                className="w-full py-2.5 text-red-400/70 hover:text-red-400 text-[13px] font-medium transition-colors"
+              >
+                {t('profile.deleteAccount')}
+              </button>
+            ) : (
+              <div className="rounded-xl bg-red-500/5 border border-red-500/20 p-4 space-y-3">
+                <p className="text-[13px] text-red-400 font-bold">{t('profile.deleteAccount')}</p>
+                <p className="text-[12px] text-white/50 leading-relaxed">{t('profile.deleteAccountDesc')}</p>
+                <p className="text-[12px] text-white/60">{t('profile.deleteAccountConfirm', { username: userProfile?.username || '' })}</p>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={e => setDeleteConfirmText(e.target.value)}
+                  placeholder={userProfile?.username || ''}
+                  autoComplete="off"
+                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[14px] text-white focus:outline-none focus:border-red-500/50 transition-colors"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}
+                    className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 font-medium text-[13px] transition-colors"
+                  >
+                    {t('settings.cancel')}
+                  </button>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={loadingAction === 'Delete' || !userProfile?.username || deleteConfirmText !== userProfile.username}
+                    className="flex-1 py-2.5 rounded-xl bg-red-500/80 hover:bg-red-500 text-white font-bold text-[13px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {loadingAction === 'Delete' ? t('auth.processing') : t('profile.deleteAccountButton')}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         {floatingWindow.resizeHandle}
       </div>
+
+      {/* WeChat bind QR overlay (stacked above the profile window) */}
+      {showWeChatBind && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 pointer-events-auto">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setShowWeChatBind(false)} />
+          <div className="relative w-full max-w-xs bg-[#1c1c1e]/95 backdrop-blur-xl border border-white/10 rounded-3xl shadow-[0_30px_80px_rgba(0,0,0,0.55)] p-6 flex flex-col items-center gap-4 animate-scaleIn">
+            <div className="w-full flex items-center justify-between">
+              <h3 className="text-white font-semibold text-[15px]">{t('profile.wechatBindTitle')}</h3>
+              <button onClick={() => setShowWeChatBind(false)} className="text-white/40 hover:text-white/80 transition-colors">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            <WeChatQR mode="link" onSuccess={handleWeChatBindSuccess} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

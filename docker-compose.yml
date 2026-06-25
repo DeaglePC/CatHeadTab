@@ -67,6 +67,17 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
 
+      # ---- WeChat 公众号登录 (可选，关注 + 验证码) ----
+      # 设置 WECHAT_TOKEN 即启用；回调 URL = ${BACKEND_URL}/api/v1/auth/wechat/callback
+      - WECHAT_TOKEN=${WECHAT_TOKEN:-}
+      # 以下仅安全/兼容模式或展示二维码时需要
+      - WECHAT_APP_ID=${WECHAT_APP_ID:-}
+      - WECHAT_AES_KEY=${WECHAT_AES_KEY:-}
+      - WECHAT_QR_IMAGE_URL=${WECHAT_QR_IMAGE_URL:-}
+      - WECHAT_ACCOUNT_NAME=${WECHAT_ACCOUNT_NAME:-}
+      # 设为 true 时把非登录消息交还官方AI回复（开发模式下保留AI）
+      - WECHAT_AI_REPLY=${WECHAT_AI_REPLY:-}
+
       # ---- Wallpaper Source: Wallhaven (可选) ----
       # 在此获取 API Key: https://wallhaven.cc/settings/account
       # 没有 Key 也可以使用（仅 SFW），有 Key 则可以获取 Sketchy 内容

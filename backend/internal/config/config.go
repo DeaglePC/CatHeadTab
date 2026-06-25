@@ -38,6 +38,29 @@ type Config struct {
 	GoogleClientID     string
 	GoogleClientSecret string
 
+	// WeChat Official Account (公众号) login via "follow + verification code".
+	// The flow is fully passive (the backend never calls outbound WeChat APIs),
+	// so it works on personal UNVERIFIED subscription accounts. Setting
+	// WeChatToken enables it. AESKey is only needed for 安全/兼容 message mode.
+	WeChatAppID string
+	// WeChatToken is the Token configured in the Official Account "服务器配置".
+	// Used to verify the signature of callbacks from WeChat servers.
+	WeChatToken string
+	// WeChatAESKey is the 43-character EncodingAESKey from "服务器配置".
+	// Required for encrypted (安全/兼容) message mode; empty means 明文 (plaintext) mode.
+	WeChatAESKey string
+	// WeChatQRImageURL is a URL to the Official Account's permanent QR image
+	// (downloaded from the 公众号后台) shown to users so they can follow. Optional.
+	WeChatQRImageURL string
+	// WeChatAccountName is the Official Account's display name, shown as a
+	// fallback / hint so users can search for it. Optional.
+	WeChatAccountName string
+	// WeChatAIReply, when true, makes the callback hand non-login messages back
+	// to WeChat's official AI reply (passive reply MsgType=transfer_biz_ai_ivr),
+	// so enabling 开发模式 doesn't disable the account's AI auto-reply. Requires
+	// the Official Account to have AI reply enabled (currently a gray release).
+	WeChatAIReply bool
+
 	// Wallpaper source: Wallhaven
 	WallhavenAPIKey string
 	// WallhavenPurity controls the allowed purity levels for wallhaven results.
@@ -131,6 +154,13 @@ func Load() *Config {
 
 		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
+
+		WeChatAppID:       getEnv("WECHAT_APP_ID", ""),
+		WeChatToken:       getEnv("WECHAT_TOKEN", ""),
+		WeChatAESKey:      getEnv("WECHAT_AES_KEY", ""),
+		WeChatQRImageURL:  getEnv("WECHAT_QR_IMAGE_URL", ""),
+		WeChatAccountName: getEnv("WECHAT_ACCOUNT_NAME", ""),
+		WeChatAIReply:     getEnv("WECHAT_AI_REPLY", "") == "true",
 
 		WallhavenAPIKey: getEnv("WALLHAVEN_API_KEY", ""),
 		WallhavenPurity: getEnv("WALLHAVEN_PURITY", "sfw"),
@@ -241,4 +271,11 @@ func (c *Config) DefaultRoleForNewUser() string {
 // IsAIConfigured returns true if server-side AI is configured.
 func (c *Config) IsAIConfigured() bool {
 	return c.AIBaseURL != "" && c.AIAPIKey != ""
+}
+
+// IsWeChatConfigured reports whether WeChat Official Account login is available.
+// Only the callback Token is required (the flow is passive); AppID/AESKey are
+// optional and only used for 安全/兼容 encrypted message mode.
+func (c *Config) IsWeChatConfigured() bool {
+	return c.WeChatToken != ""
 }

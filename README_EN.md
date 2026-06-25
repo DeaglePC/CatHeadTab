@@ -127,7 +127,7 @@ All widgets support 5 grid sizes (small/medium/large/tall/xlarge).
 
 ### Authentication & Cloud Sync
 
-- **4 auth methods**: Email+Password, GitHub OAuth, Google OAuth, CLI admin
+- **5 auth methods**: Email+Password, GitHub OAuth, Google OAuth, WeChat Official Account (follow + code), CLI admin
 - **Smart sync**: Auto-detect local/cloud changes via timestamp comparison; conflict resolution modal for divergent layouts
 - **Synced data**: Desktop layout (pages + dock), preferences, wallpaper (WebP binary), avatar
 
@@ -254,6 +254,7 @@ All external services are **optional** and degrade gracefully:
 |---------|---------------|------------|
 | SMTP | Registration skips email verification | Full email verification + password reset |
 | GitHub/Google OAuth | SSO buttons hidden | Full SSO login + account linking |
+| WeChat Official Account | "WeChat login" button hidden | Follow + verification-code login/register + binding (works on a personal unverified account) |
 | Wallhaven API Key | SFW wallpapers only | SFW + Sketchy content |
 | Tencent COS | COS wallpaper source hidden | Cloud wallpaper library available |
 | Logging (`LOG_FILE`) | Console output only | Console + file with rotation |

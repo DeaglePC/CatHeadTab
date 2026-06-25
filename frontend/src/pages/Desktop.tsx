@@ -87,16 +87,96 @@ const LockIcon = () => (
 );
 
 
-// Helper: extract mini-icon URLs from a folder's children (stable, outside component)
-function getMiniIconUrls(nodes: DesktopItem[]): string[] {
-  const urls: string[] = [];
-  for (const n of nodes) {
-    if (n.type === 'app' && n.icon) urls.push('');
-    else if (n.url) urls.push(n.url);
-    else if (n.children) urls.push(...getMiniIconUrls(n.children));
-  }
-  return urls;
+// Helper: extract mini-icon descriptors from a folder's children
+// (stable, outside component). We capture the same fields that drive the
+// full icon render (icon / url / title / iconColor) so the collapsed folder
+// thumbnail resolves icons identically to how they look inside the folder —
+// including custom icons and the colored-letter fallback.
+interface MiniIconNode {
+  type: DesktopItem['type'];
+  icon?: string;
+  url?: string;
+  title: string;
+  iconColor?: string;
 }
+
+function getMiniIconNodes(nodes: DesktopItem[]): MiniIconNode[] {
+  const out: MiniIconNode[] = [];
+  for (const n of nodes) {
+    if (n.type === 'folder' && n.children) {
+      out.push(...getMiniIconNodes(n.children));
+    } else if (n.type === 'app' || n.icon || n.url) {
+      out.push({ type: n.type, icon: n.icon, url: n.url, title: n.title, iconColor: n.iconColor });
+    }
+  }
+  return out;
+}
+
+// Renders a single tile inside the collapsed folder thumbnail, mirroring the
+// icon-resolution precedence of DesktopIconContent (custom emoji/text icon →
+// custom http image → favicon-from-url) and falling back to the same colored
+// letter so the preview always matches what's shown inside the folder.
+const MiniPreviewIcon: React.FC<{ node: MiniIconNode }> = ({ node }) => {
+  const [imgFailed, setImgFailed] = useState(false);
+  const fallbackText = node.title || node.url || 'Untitled';
+  const fallbackSeed = node.url || node.title;
+
+  // App tiles and non-http (emoji / text) custom icons render as a glyph.
+  if (node.type === 'app' || (node.icon && !node.icon.startsWith('http'))) {
+    return (
+      <span className="flex items-center justify-center w-full h-full text-[13px] leading-none">
+        {node.icon || '📦'}
+      </span>
+    );
+  }
+
+  // Custom http icon: plain image with a colored-letter fallback on error.
+  if (node.icon && node.icon.startsWith('http')) {
+    if (imgFailed) {
+      return (
+        <IconFallback
+          className="w-full h-full text-[10px]"
+          color={node.iconColor}
+          seed={fallbackSeed}
+          text={fallbackText}
+        />
+      );
+    }
+    return (
+      <img
+        src={node.icon}
+        className="w-[88%] h-[88%] object-contain"
+        alt=""
+        decoding="async"
+        loading="lazy"
+        draggable={false}
+        onDragStart={(e) => e.preventDefault()}
+        onError={() => setImgFailed(true)}
+      />
+    );
+  }
+
+  // URL-only: favicon with the same colored-letter fallback used inside the folder.
+  if (node.url) {
+    return (
+      <FaviconImg
+        url={node.url}
+        sz={64}
+        className="w-[88%] h-[88%] object-contain text-[10px]"
+        fallbackColor={node.iconColor}
+        fallbackText={fallbackText}
+        fallbackSeed={fallbackSeed}
+        alt=""
+        decoding="async"
+        loading="lazy"
+        draggable={false}
+        onDragStart={(e) => e.preventDefault()}
+      />
+    );
+  }
+
+  return null;
+};
 
 // === DesktopIcon Component (static, used for DragOverlay and non-draggable contexts) ===
 const DesktopIconContent: React.FC<{ 
@@ -112,7 +192,7 @@ const DesktopIconContent: React.FC<{
   // Memoize mini-icon URLs so that identical children arrays don't regenerate
   // new <img> elements and cause the folder preview to flicker.
   const miniIcons = useMemo(
-    () => isFolder && item.children ? getMiniIconUrls(item.children).slice(0, 9) : [],
+    () => isFolder && item.children ? getMiniIconNodes(item.children).slice(0, 9) : [],
     [isFolder, item.children],
   );
 
@@ -200,19 +280,9 @@ const DesktopIconContent: React.FC<{
       }`}>
         {isFolder ? (
           <div className="grid grid-cols-3 grid-rows-3 gap-1 p-2.5 w-full h-full">
-            {miniIcons.map((url, i) => (
-              <div key={`${i}-${url}`} className="rounded-[3px] overflow-hidden bg-white/[0.04] flex items-center justify-center">
-                <FaviconImg
-                  url={url}
-                  sz={64}
-                  className="w-[88%] h-[88%] object-contain"
-                  alt=""
-                  decoding="async"
-                  loading="lazy"
-                  draggable={false}
-                  onDragStart={(e) => e.preventDefault()}
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                />
+            {miniIcons.map((node, i) => (
+              <div key={`${i}-${node.url || node.icon || node.title}`} className="rounded-[3px] overflow-hidden bg-white/[0.04] flex items-center justify-center">
+                <MiniPreviewIcon node={node} />
               </div>
             ))}
             {miniIcons.length === 0 && (
@@ -315,7 +385,13 @@ const DesktopIconContent: React.FC<{
     if (!ac || !bc) return false;
     if (ac.length !== bc.length) return false;
     for (let i = 0; i < ac.length; i++) {
-      if (ac[i].id !== bc[i].id || ac[i].url !== bc[i].url || ac[i].icon !== bc[i].icon) return false;
+      if (
+        ac[i].id !== bc[i].id
+        || ac[i].url !== bc[i].url
+        || ac[i].icon !== bc[i].icon
+        || ac[i].title !== bc[i].title
+        || ac[i].iconColor !== bc[i].iconColor
+      ) return false;
     }
   }
   return true;

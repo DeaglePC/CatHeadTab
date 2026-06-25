@@ -51,6 +51,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 	// Initialize services
 	emailService := service.NewEmailService(cfg)
+	wechatSvc := service.NewWeChatService(cfg)
+	wechatSessions := service.NewWeChatSessionStore()
 
 	// Initialize preset repository
 	presetRepo := repository.NewPresetRepository(repository.DB)
@@ -103,7 +105,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	}()
 
 	// Initialize handlers
-	authHandler := handler.NewAuthHandler(userRepo, verifyRepo, oauthRepo, emailService, cfg)
+	authHandler := handler.NewAuthHandler(userRepo, verifyRepo, oauthRepo, emailService, wechatSvc, wechatSessions, cfg)
 	bookmarkHandler := handler.NewBookmarkHandler(repository.NewBookmarkRepository())
 	layoutHandler := handler.NewLayoutHandler(layoutRepo)
 	userHandler := handler.NewUserHandler(userRepo, cfg)
@@ -125,6 +127,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 	// Rate limiter for login endpoint (max 10 requests per minute per IP + progressive blocking)
 	loginRateLimiter := middleware.NewLoginRateLimiter(10)
+
+	// Rate limiter for WeChat verification-code issuance (1 per 3s per IP / user)
+	// to avoid code spam. Polling is intentionally unlimited.
+	wechatRateLimiter := middleware.NewRateLimiter(3 * time.Second)
 
 	// Rate limiter for AI chat endpoint (RPM + daily token limit)
 	aiRateLimiter := middleware.NewAIRateLimiter(cfg.AIRateLimitRPM, cfg.AIDailyTokenLimit, aiUsageRepo)
@@ -177,6 +183,14 @@ func Setup(cfg *config.Config) *gin.Engine {
 		// OAuth callback endpoints (GitHub/Google redirect here after authorization)
 		auth.GET("/callback/github", authHandler.GitHubOAuthCallback)
 		auth.GET("/callback/google", authHandler.GoogleOAuthCallback)
+
+		// WeChat Official Account "follow + verification code" login
+		auth.POST("/wechat/login", middleware.EmailRateLimit(wechatRateLimiter), authHandler.WeChatLogin)
+		auth.GET("/wechat/poll", authHandler.WeChatPoll)
+		// WeChat server callback (configured in 公众号后台 服务器配置). Same path
+		// serves GET (URL verification) and POST (message push).
+		auth.GET("/wechat/callback", authHandler.WeChatCallback)
+		auth.POST("/wechat/callback", authHandler.WeChatCallback)
 	}
 
 	// Protected routes (JWT required)
@@ -191,6 +205,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 			user.GET("/preferences", userHandler.GetPreferences)
 			user.PUT("/preferences", userHandler.UpdatePreferences)
 
+			// Account deletion (irreversible; the only exit for single-login accounts)
+			user.DELETE("", userHandler.DeleteAccount)
+
 			// Avatar upload/delete (no email verification required)
 			user.POST("/avatar", userHandler.UploadAvatar)
 			user.DELETE("/avatar", userHandler.DeleteAvatar)
@@ -201,6 +218,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 			user.GET("/linked-accounts", authHandler.GetLinkedAccounts)
 			user.POST("/link/github", authHandler.GitHubLinkAccount)
 			user.POST("/link/google", authHandler.GoogleLinkAccount)
+			// WeChat bind: returns a verification code; the chat message links via the public callback.
+			user.POST("/link/wechat", middleware.EmailRateLimit(wechatRateLimiter), authHandler.WeChatLinkStart)
 			user.DELETE("/link/:provider", authHandler.UnlinkAccount)
 		}
 

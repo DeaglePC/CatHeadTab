@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/CatHeadTab/backend/internal/config"
+	"github.com/CatHeadTab/backend/internal/logger"
 	"github.com/CatHeadTab/backend/internal/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -26,6 +27,35 @@ type UserHandler struct {
 // NewUserHandler creates a new UserHandler.
 func NewUserHandler(repo repository.UserRepository, cfg *config.Config) *UserHandler {
 	return &UserHandler{userRepo: repo, cfg: cfg}
+}
+
+// DeleteAccount permanently deletes the logged-in user's account and all
+// associated data (OAuth links, layout, bookmarks, background, etc. via
+// ON DELETE CASCADE). Irreversible. This is the only way to remove a
+// single-login account (e.g. WeChat-only), which cannot unlink its sole
+// login method; afterwards the freed identity (openid/email) can be reused.
+// DELETE /api/v1/user
+func (h *UserHandler) DeleteAccount(c *gin.Context) {
+	userID, err := uuid.Parse(c.GetString("user_id"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid session"})
+		return
+	}
+
+	user, err := h.userRepo.GetByID(userID)
+	if err != nil || user == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	if err := h.userRepo.DeleteByID(userID); err != nil {
+		logger.Error("failed to delete account", "user_id", userID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete account"})
+		return
+	}
+
+	logger.Info("account deleted", "user_id", userID, "username", user.Username)
+	c.JSON(http.StatusOK, gin.H{"message": "Account deleted"})
 }
 
 // GetPreferences returns the user's preferences.
