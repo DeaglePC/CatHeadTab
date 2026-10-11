@@ -17,7 +17,7 @@ const triggerAutoSync = () => {
 export type DesktopItemType = 'app' | 'link' | 'folder' | 'widget';
 
 /** Widget types supported by the system. */
-export type WidgetType = 'calendar' | 'weather' | 'countdown' | 'systemMonitor' | 'clock' | 'itTools' | 'stickyNote' | 'stock' | 'exchangeRate' | 'calculator' | 'aiAgent' | 'githubTrending' | 'bilibiliHot' | 'xiaohongshuHot' | 'weiboHot' | 'bbcNews';
+export type WidgetType = 'calendar' | 'weather' | 'countdown' | 'reminders' | 'systemMonitor' | 'clock' | 'itTools' | 'stickyNote' | 'stock' | 'exchangeRate' | 'calculator' | 'aiAgent' | 'githubTrending' | 'bilibiliHot' | 'xiaohongshuHot' | 'weiboHot' | 'bbcNews';
 
 /** Widget size presets (columns × rows in the desktop grid). */
 export type WidgetSize = 'small' | 'medium' | 'large' | 'tall' | 'xlarge';
@@ -50,6 +50,23 @@ export interface CountdownWidgetConfig {
   targetDate: string;
   /** Display label for the countdown event. */
   eventName: string;
+}
+
+export interface ReminderItem {
+  id: string;
+  title: string;
+  /** Start of the countdown; older reminders fall back to createdAt. */
+  startAt?: string;
+  dueAt: string;
+  note: string;
+  createdAt: string;
+  completedAt?: string;
+  showProgress: boolean;
+}
+
+export interface RemindersWidgetConfig {
+  widgetType: 'reminders';
+  items: ReminderItem[];
 }
 
 export interface SystemMonitorWidgetConfig {
@@ -148,7 +165,7 @@ export interface BBCNewsWidgetConfig {
   widgetType: 'bbcNews';
 }
 
-export type WidgetConfig = CalendarWidgetConfig | WeatherWidgetConfig | CountdownWidgetConfig | SystemMonitorWidgetConfig | ClockWidgetConfig | ItToolsWidgetConfig | StickyNoteWidgetConfig | StockWidgetConfig | ExchangeRateWidgetConfig | CalculatorWidgetConfig | AiAgentWidgetConfig | GithubTrendingWidgetConfig | BilibiliHotWidgetConfig | XiaohongshuHotWidgetConfig | WeiboHotWidgetConfig | BBCNewsWidgetConfig;
+export type WidgetConfig = CalendarWidgetConfig | WeatherWidgetConfig | CountdownWidgetConfig | RemindersWidgetConfig | SystemMonitorWidgetConfig | ClockWidgetConfig | ItToolsWidgetConfig | StickyNoteWidgetConfig | StockWidgetConfig | ExchangeRateWidgetConfig | CalculatorWidgetConfig | AiAgentWidgetConfig | GithubTrendingWidgetConfig | BilibiliHotWidgetConfig | XiaohongshuHotWidgetConfig | WeiboHotWidgetConfig | BBCNewsWidgetConfig;
 
 export interface DesktopItem {
   id: string;

@@ -33,6 +33,7 @@ const ExploreWorld = lazy(() => import('../components/ExploreWorld').then(m => (
 const AddWidgetModal = lazy(() => import('../components/AddWidgetModal').then(m => ({ default: m.AddWidgetModal })));
 const ItToolsModal = lazy(() => import('../components/ItToolsModal').then(m => ({ default: m.ItToolsModal })));
 const StickyNoteModal = lazy(() => import('../components/StickyNoteModal').then(m => ({ default: m.StickyNoteModal })));
+const RemindersModal = lazy(() => import('../components/RemindersModal').then(m => ({ default: m.RemindersModal })));
 const AiAgentModal = lazy(() => import('../components/AiAgentModal').then(m => ({ default: m.AiAgentModal })));
 const TrendingModal = lazy(() => import('../components/TrendingModal').then(m => ({ default: m.TrendingModal })));
 const CalendarDetailModal = lazy(() => import('../components/CalendarDetailModal').then(m => ({ default: m.CalendarDetailModal })));
@@ -588,9 +589,10 @@ const SortableDesktopIcon: React.FC<{
 const SortableWidget: React.FC<{
   item: DesktopItem;
   onClick: (item: DesktopItem) => void;
+  onQuickAddReminder: (item: DesktopItem) => void;
   onContextMenu?: (e: React.MouseEvent, item: DesktopItem) => void;
   activeId?: string | null;
-}> = ({ item, onClick, onContextMenu, activeId }) => {
+}> = ({ item, onClick, onQuickAddReminder, onContextMenu, activeId }) => {
   const {
     attributes,
     listeners,
@@ -638,7 +640,7 @@ const SortableWidget: React.FC<{
       }}
     >
       <div className="w-full h-full transition-transform duration-200 group-hover:scale-[1.05] group-active:scale-[0.98]">
-        <DesktopWidget item={item} />
+        <DesktopWidget item={item} onQuickAddReminder={item.widgetType === 'reminders' ? () => onQuickAddReminder(item) : undefined} />
       </div>
     </div>
   );
@@ -905,6 +907,8 @@ export const Desktop: React.FC = () => {
   const [isItToolsOpen, setIsItToolsOpen] = useState(false);
   // Sticky Note state
   const [stickyNoteItem, setStickyNoteItem] = useState<DesktopItem | null>(null);
+  const [remindersItem, setRemindersItem] = useState<DesktopItem | null>(null);
+  const [quickAddReminder, setQuickAddReminder] = useState(false);
   // AI Agent chat modal state
   const [isAiAgentOpen, setIsAiAgentOpen] = useState(false);
   // Trending modal state
@@ -1093,6 +1097,9 @@ export const Desktop: React.FC = () => {
         return;
       } else if (item.widgetType === 'stickyNote') {
         setStickyNoteItem(item);
+      } else if (item.widgetType === 'reminders') {
+        setQuickAddReminder(false);
+        setRemindersItem(item);
       } else if (item.widgetType === 'stock') {
         // Stock widget manages its own detail modal internally — do nothing here
         return;
@@ -1516,7 +1523,7 @@ export const Desktop: React.FC = () => {
       isSettingsOpen || isAuthOpen || isProfileOpen ||
       isBookmarkBrowserOpen || isHistoryBrowserOpen ||
       isExploreOpen || isItToolsOpen || isAddWidgetOpen ||
-      isAddModalOpen || !!stickyNoteItem || !!editingWidget
+      isAddModalOpen || !!stickyNoteItem || !!remindersItem || !!editingWidget
     ) return;
     setContextMenu({ x: e.clientX, y: e.clientY, item, inDock });
   };
@@ -2180,6 +2187,7 @@ export const Desktop: React.FC = () => {
                           key={item.id}
                           item={item}
                           onClick={handleItemClick}
+                          onQuickAddReminder={(reminderWidget) => { setQuickAddReminder(true); setRemindersItem(reminderWidget); }}
                           onContextMenu={(e, i) => handleContextMenu(e, i, false)}
                           activeId={activeId}
                         />
@@ -2463,6 +2471,7 @@ export const Desktop: React.FC = () => {
       {isExploreOpen && <ExploreWorld onClose={() => setIsExploreOpen(false)} />}
       {isItToolsOpen && <ItToolsModal onClose={() => setIsItToolsOpen(false)} />}
       {stickyNoteItem && <StickyNoteModal onClose={() => setStickyNoteItem(null)} item={stickyNoteItem} />}
+      {remindersItem && <RemindersModal onClose={() => setRemindersItem(null)} item={remindersItem} quickCreate={quickAddReminder} />}
       {isAiAgentOpen && <AiAgentModal onClose={() => setIsAiAgentOpen(false)} />}
       {trendingModalType && <TrendingModal type={trendingModalType} options={trendingModalOptions} onClose={() => { setTrendingModalType(null); setTrendingModalOptions(null); }} />}
       {calendarDetailItem && (

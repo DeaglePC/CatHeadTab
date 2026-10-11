@@ -1,6 +1,7 @@
 export { CalendarWidget } from './CalendarWidget';
 export { WeatherWidget } from './WeatherWidget';
 export { CountdownWidget } from './CountdownWidget';
+export { RemindersWidget } from './RemindersWidget';
 export { SystemMonitorWidget } from './SystemMonitorWidget';
 export { ClockWidget } from './ClockWidget';
 export { StickyNoteWidget } from './StickyNoteWidget';

@@ -348,6 +348,14 @@ body.floating-window-resizing .wallpaper-grid-card {
   overscroll-behavior: contain;
 }
 
+.reminders-widget-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.reminders-widget-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 .icon-options-scroll {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;

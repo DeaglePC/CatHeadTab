@@ -422,6 +422,8 @@ export const en = {
   'widget.weatherDesc': 'Current weather and temperature',
   'widget.countdown': 'Countdown',
   'widget.countdownDesc': 'Countdown to an important date',
+  'widget.reminders': 'Reminders',
+  'widget.remindersDesc': 'Tall to-do list with deadline progress',
   'widget.systemMonitor': 'System Monitor',
   'widget.systemMonitorDesc': 'Real-time CPU & memory usage',
   'widget.clock': 'Clock',

@@ -1,9 +1,10 @@
 import React from 'react';
-import type { DesktopItem, WidgetSize, WeatherWidgetConfig, CountdownWidgetConfig, ClockWidgetConfig, StickyNoteWidgetConfig, StockWidgetConfig, ExchangeRateWidgetConfig, GithubTrendingWidgetConfig } from '../../store/layoutStore';
+import type { DesktopItem, WidgetSize, WeatherWidgetConfig, CountdownWidgetConfig, RemindersWidgetConfig, ClockWidgetConfig, StickyNoteWidgetConfig, StockWidgetConfig, ExchangeRateWidgetConfig, GithubTrendingWidgetConfig } from '../../store/layoutStore';
 import { WIDGET_SIZE_MAP } from '../../store/layoutStore';
 import { CalendarWidget } from './CalendarWidget';
 import { WeatherWidget } from './WeatherWidget';
 import { CountdownWidget } from './CountdownWidget';
+import { RemindersWidget } from './RemindersWidget';
 import { SystemMonitorWidget } from './SystemMonitorWidget';
 import { ClockWidget } from './ClockWidget';
 import { StickyNoteWidget } from './StickyNoteWidget';
@@ -20,6 +21,7 @@ import { BBCNewsWidget } from './BBCNewsWidget';
 interface DesktopWidgetProps {
   item: DesktopItem;
   isOverlay?: boolean;
+  onQuickAddReminder?: () => void;
 }
 
 /** Returns the CSS grid-column and grid-row span values for a widget size. */
@@ -32,7 +34,7 @@ export function getWidgetGridStyle(size: WidgetSize): React.CSSProperties {
 }
 
 /** Renders the widget card with glass styling and appropriate content. */
-export const DesktopWidget: React.FC<DesktopWidgetProps> = ({ item, isOverlay }) => {
+export const DesktopWidget: React.FC<DesktopWidgetProps> = ({ item, isOverlay, onQuickAddReminder }) => {
   const renderWidget = () => {
     const size = item.widgetSize || 'small';
     switch (item.widgetType) {
@@ -42,6 +44,8 @@ export const DesktopWidget: React.FC<DesktopWidgetProps> = ({ item, isOverlay })
         return <WeatherWidget size={size} config={item.widgetConfig as WeatherWidgetConfig} />;
       case 'countdown':
         return <CountdownWidget size={size} config={item.widgetConfig as CountdownWidgetConfig} />;
+      case 'reminders':
+        return <RemindersWidget size={size} config={item.widgetConfig as RemindersWidgetConfig} onQuickAdd={onQuickAddReminder} />;
       case 'systemMonitor':
         return <SystemMonitorWidget size={size} />;
       case 'clock':

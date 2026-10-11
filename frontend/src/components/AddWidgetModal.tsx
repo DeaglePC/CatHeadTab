@@ -118,6 +118,13 @@ const WIDGET_CATEGORIES: WidgetCategory[] = [
         sizes: ['small'],
       },
       {
+        type: 'reminders',
+        icon: '✅',
+        labelKey: 'widget.reminders',
+        descKey: 'widget.remindersDesc',
+        sizes: ['tall', 'xlarge'],
+      },
+      {
         type: 'aiAgent',
         icon: '',
         labelKey: 'widget.aiAgent',
@@ -586,6 +593,9 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({ onClose, pageInd
           eventName: eventName || (isZh ? '未命名事件' : 'Unnamed Event'),
         };
         break;
+      case 'reminders':
+        config = { widgetType: 'reminders', items: isEditMode && editItem.widgetConfig?.widgetType === 'reminders' ? editItem.widgetConfig.items : [] };
+        break;
       case 'systemMonitor':
         config = { widgetType: 'systemMonitor' };
         break;
@@ -986,6 +996,9 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({ onClose, pageInd
                   {selectedType === 'countdown' && (isZh
                     ? '⏱️ 倒计时小组件会显示距离目标日期的剩余天数。小尺寸显示天数和事件名，中尺寸额外显示时分秒倒计时。'
                     : '⏱️ The countdown widget shows days remaining until your target date. Small size shows days and event name, medium size adds hours, minutes and seconds.')}
+                  {selectedType === 'reminders' && (isZh
+                    ? '✅ 竖向提醒列表。点击组件可添加、编辑、完成或删除事项；备注仅在展开详情时显示。进度条按剩余时间变化颜色。'
+                    : '✅ A tall reminder list. Click to add, edit, complete or delete items. Notes appear only when expanded, and time bars change color as deadlines approach.')}
                   {selectedType === 'systemMonitor' && (isZh
                     ? '🖥️ 系统监控小组件实时显示 CPU 和内存使用率。小尺寸显示双环形图概览，中尺寸额外显示处理器型号、核心数等详细信息。'
                     : '🖥️ The system monitor widget shows real-time CPU and memory usage. Small size displays dual ring gauges, medium size adds processor model, core count and more details.')}
